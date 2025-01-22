@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 3em;
+            text-shadow: 0 0 10px #00fff2, 0 0 20px #00fff2, 0 0 30px #00fff2;
+            margin-bottom: 30px;
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #00fff2, 0 0 20px #00fff2;
+            }
+            to {
+                text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #00fff2, 0 0 40px #00fff2;
+            }
+        }
+        
+        #game-container {
+            position: relative;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 255, 242, 0.2);
+            backdrop-filter: blur(5px);
+        }
+        
+        #game-board {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            right: -150px;
+            padding: 15px 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 1.2em;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 20px rgba(0, 255, 242, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .controls {
+            margin-top: 30px;
+            display: flex;
+            gap: 20px;
+            perspective: 1000px;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            border: none;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            display: none;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 50px rgba(0, 255, 242, 0.3);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .game-over h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #ff0000;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+
+        .game-over p {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TETRIS</h1>
+    <div id="game-container">
+        <canvas id="game-board" width="300" height="600"></canvas>
+        <div id="score">Score: <span id="score-value">0</span></div>
+        <div class="game-over" id="game-over">
+            <h2>Game Over!</h2>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <button onclick="resetGame()">Play Again</button>
+        </div>
+    </div>
+    <div class="controls">
+        <button onclick="moveLeft()">← Left</button>
+        <button onclick="moveRight()">Right →</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-board');
+        const ctx = canvas.getContext('2d');
+        const BLOCK_SIZE = 30;
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+        
+        let score = 0;
+        let gameBoard = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+        let currentPiece = null;
+        let gameLoop = null;
+        let gameOver = false;
+
+        const SHAPES = [
+            [[1, 1, 1, 1]], // I
+            [[1, 1], [1, 1]], // O
+            [[1, 1, 1], [0, 1, 0]], // T
+            [[1, 1, 1], [1, 0, 0]], // L
+            [[1, 1, 1], [0, 0, 1]], // J
+            [[1, 1, 0], [0, 1, 1]], // S
+            [[0, 1, 1], [1, 1, 0]]  // Z
+        ];
+
+        // Enhanced color palette with gradients
+        const COLORS = [
+            ['#00f0f0', '#00d0d0'], // cyan
+            ['#f0f000', '#d0d000'], // yellow
+            ['#a000f0', '#8000d0'], // purple
+            ['#f0a000', '#d08000'], // orange
+            ['#0000f0', '#0000d0'], // blue
+            ['#00f000', '#00d000'], // green
+            ['#f00000', '#d00000']  // red
+        ];
+
+        class Piece {
+            constructor(shape = null, color = null) {
+                this.shape = shape || SHAPES[Math.floor(Math.random() * SHAPES.length)];
+                this.colorIndex = Math.floor(Math.random() * COLORS.length);
+                this.color = color || COLORS[this.colorIndex];
+                this.x = Math.floor((BOARD_WIDTH - this.shape[0].length) / 2);
+                this.y = 0;
+            }
+
+            draw() {
+                for(let row = 0; row < this.shape.length; row++) {
+                    for(let col = 0; col < this.shape[row].length; col++) {
+                        if(this.shape[row][col]) {
+                            drawBlock(this.x + col, this.y + row, this.color);
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawBlock(x, y, [color1, color2]) {
+            const gradient = ctx.createLinearGradient(
+                x * BLOCK_SIZE, 
+                y * BLOCK_SIZE, 
+                (x + 1) * BLOCK_SIZE, 
+                (y + 1) * BLOCK_SIZE
+            );
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            
+            // Main block with gradient
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+            
+            // Add 3D effect
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + 4);
+            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
+            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Shadow effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
+            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Inner highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(
+                x * BLOCK_SIZE + 6,
+                y * BLOCK_SIZE + 6,
+                BLOCK_SIZE - 12,
+                BLOCK_SIZE - 12
+            );
+        }
+
+        function drawBoard() {
+            // Clear canvas with a subtle gradient background
+            const bgGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            bgGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
+            bgGradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 0.5;
+            for(let i = 0; i <= BOARD_WIDTH; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * BLOCK_SIZE, 0);
+                ctx.lineTo(i * BLOCK_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            for(let i = 0; i <= BOARD_HEIGHT; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * BLOCK_SIZE);
+                ctx.lineTo(canvas.width, i * BLOCK_SIZE);
+                ctx.stroke();
+            }
+            
+            // Draw placed blocks
+            for(let row = 0; row < BOARD_HEIGHT; row++) {
+                for(let col = 0; col < BOARD_WIDTH; col++) {
+                    if(gameBoard[row][col]) {
+                        drawBlock(col, row, gameBoard[row][col]);
+                    }
+                }
+            }
+            
+            // Draw current piece
+            if(currentPiece) {
+                currentPiece.draw();
+            }
+        }
+
+        function moveLeft() {
+            if(!currentPiece || gameOver) return;
+            currentPiece.x--;
+            if(isCollision()) {
+                currentPiece.x++;
+            }
+            drawBoard();
+        }
+
+        function moveRight() {
+            if(!currentPiece || gameOver) return;
+            currentPiece.x++;
+            if(isCollision()) {
+                currentPiece.x--;
+            }
+            drawBoard();
+        }
+
+        function moveDown() {
+            if(!currentPiece) return;
+            currentPiece.y++;
+            if(isCollision()) {
+                currentPiece.y--;
+                placePiece();
+                return false;
+            }
+            return true;
+        }
+
+        function isCollision() {
+            for(let row = 0; row < currentPiece.shape.length; row++) {
+                for(let col = 0; col < currentPiece.shape[row].length; col++) {
+                    if(currentPiece.shape[row][col]) {
+                        let newX = currentPiece.x + col;
+                        let newY = currentPiece.y + row;
+                        
+                        if(newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) {
+                            return true;
+                        }
+                        
+                        if(newY >= 0 && gameBoard[newY][newX]) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function placePiece() {
+            for(let row = 0; row < currentPiece.shape.length; row++) {
+                for(let col = 0; col < currentPiece.shape[row].length; col++) {
+                    if(currentPiece.shape[row][col]) {
+                        let newY = currentPiece.y + row;
+                        if(newY <
