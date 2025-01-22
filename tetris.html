@@ -23,10 +23,10 @@
 
         @keyframes glow {
             from {
-                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #00fff2, 0 0 20px #00fff2;
+                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #00fff2;
             }
             to {
-                text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #00fff2, 0 0 40px #00fff2;
+                text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #00fff2;
             }
         }
         
@@ -43,7 +43,6 @@
             border: 3px solid rgba(255, 255, 255, 0.1);
             background: rgba(0, 0, 0, 0.7);
             border-radius: 10px;
-            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
         }
         
         #score {
@@ -55,22 +54,13 @@
             border-radius: 10px;
             font-size: 1.2em;
             backdrop-filter: blur(5px);
-            box-shadow: 0 0 20px rgba(0, 255, 242, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
         }
         
         .controls {
             margin-top: 30px;
             display: flex;
             gap: 20px;
-            perspective: 1000px;
         }
         
         button {
@@ -88,13 +78,20 @@
         }
         
         button:hover {
-            transform: translateY(-3px) scale(1.05);
+            transform: translateY(-3px);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
             background: linear-gradient(45deg, #45a049, #4CAF50);
         }
 
-        button:active {
-            transform: translateY(1px);
+        #start-button {
+            background: linear-gradient(45deg, #ff4081, #ff1744);
+            font-size: 24px;
+            padding: 20px 40px;
+            margin-bottom: 20px;
+        }
+
+        #start-button:hover {
+            background: linear-gradient(45deg, #ff1744, #ff4081);
         }
         
         .game-over {
@@ -109,25 +106,29 @@
             display: none;
             backdrop-filter: blur(10px);
             border: 2px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 50px rgba(0, 255, 242, 0.3);
             animation: fadeIn 0.5s ease-out;
         }
 
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        }
-
-        .game-over h2 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
-            color: #ff0000;
-            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
-        }
-
-        .game-over p {
-            font-size: 1.5em;
-            margin-bottom: 30px;
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
     </style>
 </head>
@@ -135,8 +136,11 @@
     <h1>TETRIS</h1>
     <div id="game-container">
         <canvas id="game-board" width="300" height="600"></canvas>
+        <div id="start-screen">
+            <button id="start-button">Start Game</button>
+        </div>
         <div id="score">Score: <span id="score-value">0</span></div>
-        <div class="game-over" id="game-over">
+        <div class="game-over hidden" id="game-over">
             <h2>Game Over!</h2>
             <p>Final Score: <span id="final-score">0</span></p>
             <button onclick="resetGame()">Play Again</button>
@@ -150,6 +154,8 @@
     <script>
         const canvas = document.getElementById('game-board');
         const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
         const BLOCK_SIZE = 30;
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20;
@@ -159,6 +165,7 @@
         let currentPiece = null;
         let gameLoop = null;
         let gameOver = false;
+        let gameStarted = false;
 
         const SHAPES = [
             [[1, 1, 1, 1]], // I
@@ -170,7 +177,6 @@
             [[0, 1, 1], [1, 1, 0]]  // Z
         ];
 
-        // Enhanced color palette with gradients
         const COLORS = [
             ['#00f0f0', '#00d0d0'], // cyan
             ['#f0f000', '#d0d000'], // yellow
@@ -211,65 +217,24 @@
             gradient.addColorStop(0, color1);
             gradient.addColorStop(1, color2);
             
-            // Main block with gradient
             ctx.fillStyle = gradient;
             ctx.fillRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
             
-            // Add 3D effect
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.beginPath();
-            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + 4);
-            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4);
-            ctx.closePath();
-            ctx.fill();
+            // Highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + 2, 2, BLOCK_SIZE - 4);
+            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + 2, BLOCK_SIZE - 4, 2);
             
-            ctx.beginPath();
-            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
-            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Shadow effect
+            // Shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.moveTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + 4);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.beginPath();
-            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE);
-            ctx.lineTo(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
-            ctx.lineTo(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + BLOCK_SIZE - 4);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Inner highlight
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.fillRect(
-                x * BLOCK_SIZE + 6,
-                y * BLOCK_SIZE + 6,
-                BLOCK_SIZE - 12,
-                BLOCK_SIZE - 12
-            );
+            ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 4, y * BLOCK_SIZE + 2, 2, BLOCK_SIZE - 4);
+            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + BLOCK_SIZE - 4, BLOCK_SIZE - 4, 2);
         }
 
         function drawBoard() {
-            // Clear canvas with a subtle gradient background
-            const bgGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            bgGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-            bgGradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
-            ctx.fillStyle = bgGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw grid lines
+            // Draw background grid
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.lineWidth = 0.5;
             for(let i = 0; i <= BOARD_WIDTH; i++) {
@@ -300,8 +265,21 @@
             }
         }
 
+        function startGame() {
+            gameStarted = true;
+            gameOver = false;
+            score = 0;
+            document.getElementById('score-value').textContent = score;
+            gameBoard = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+            currentPiece = new Piece();
+            startScreen.classList.add('hidden');
+            if(gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, 1000);
+            drawBoard();
+        }
+
         function moveLeft() {
-            if(!currentPiece || gameOver) return;
+            if(!currentPiece || gameOver || !gameStarted) return;
             currentPiece.x--;
             if(isCollision()) {
                 currentPiece.x++;
@@ -310,7 +288,7 @@
         }
 
         function moveRight() {
-            if(!currentPiece || gameOver) return;
+            if(!currentPiece || gameOver || !gameStarted) return;
             currentPiece.x++;
             if(isCollision()) {
                 currentPiece.x--;
@@ -319,7 +297,7 @@
         }
 
         function moveDown() {
-            if(!currentPiece) return;
+            if(!currentPiece || !gameStarted) return;
             currentPiece.y++;
             if(isCollision()) {
                 currentPiece.y--;
@@ -354,4 +332,74 @@
                 for(let col = 0; col < currentPiece.shape[row].length; col++) {
                     if(currentPiece.shape[row][col]) {
                         let newY = currentPiece.y + row;
-                        if(newY <
+                        if(newY < 0) {
+                            gameOver = true;
+                            endGame();
+                            return;
+                        }
+                        gameBoard[newY][currentPiece.x + col] = currentPiece.color;
+                    }
+                }
+            }
+            
+            clearLines();
+            currentPiece = new Piece();
+            if(isCollision()) {
+                gameOver = true;
+                endGame();
+            }
+        }
+
+        function clearLines() {
+            for(let row = BOARD_HEIGHT - 1; row >= 0; row--) {
+                if(gameBoard[row].every(cell => cell !== 0)) {
+                    gameBoard.splice(row, 1);
+                    gameBoard.unshift(Array(BOARD_WIDTH).fill(0));
+                    score += 100;
+                    document.getElementById('score-value').textContent = score;
+                }
+            }
+        }
+
+        function endGame() {
+            clearInterval(gameLoop);
+            document.getElementById('game-over').classList.remove('hidden');
+            document.getElementById('final-score').textContent = score;
+            startScreen.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            document.getElementById('game-over').classList.add('hidden');
+            startGame();
+        }
+
+        function update() {
+            if(!gameOver && gameStarted) {
+                moveDown();
+                drawBoard();
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if(gameOver || !gameStarted) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    moveLeft();
+                    break;
+                case 'ArrowRight':
+                    moveRight();
+                    break;
+                case 'ArrowDown':
+                    moveDown();
+                    break;
+            }
+        });
+
+        // Initialize game
+        startButton.addEventListener('click', startGame);
+        drawBoard();
+    </script>
+</body>
+</html>
